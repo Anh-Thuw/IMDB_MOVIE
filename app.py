@@ -1,11 +1,8 @@
 from flask import Flask, render_template
-import views
+from imdb_movie import create_app
 
 
-app = Flask(__name__)
-app.secret_key = '123'
-
-views.init_views(app)
+app = create_app() 
 
 if __name__ == '__main__':
     app.run(debug=True)
