@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, flash, jsonify
+from flask import Blueprint, render_template, request, flash, jsonify 
 from tensorflow.keras.models import load_model
 import numpy as np
 import imdb_movie.forms as forms
@@ -7,11 +7,13 @@ from flask_login import login_required, current_user
 from .models import Note
 from . import db
 import json
+import pickle
+import pandas as pd
 
 views = Blueprint('views', __name__)
 
-@views.route('/', methods=['GET', 'POST'])
 
+@views.route('/', methods=['GET', 'POST'])
 @login_required
 def home():
     if request.method == 'POST': 
@@ -40,71 +42,74 @@ def delete_note():
 
     return jsonify({})
 
+#--------------------------------------------model prediction--------------------------------------------
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#load model 
 model = load_model('imdb_movie/training_model/imdbMovie_model.keras')
 
+# Load encoders and scaler
+with open('training_model/categorical_columns.pkl', 'rb') as f:
+    categorical_columns = pickle.load(f)
+
+with open('training_model/numerical_columns.pkl', 'rb') as f:
+    numerical_columns = pickle.load(f)
+
+with open('training_model/standard_scaler.pkl', 'rb') as f:
+    scaler = pickle.load(f)
+
+# Load và tiền xử lý dữ liệu huấn luyện một lần khi ứng dụng khởi động
+training_data = pd.read_csv('imdb_movie/training_model/IMDb_Dataset_2.csv')
+training_categorical = training_data[categorical_columns]
+training_categorical_encoded = pd.get_dummies(training_categorical, columns=categorical_columns)
+# Lưu danh sách các cột đã mã hóa one-hot
+training_encoded_columns = training_categorical_encoded.columns
 
 
 
+@views.route('/predict', methods=['GET', 'POST'])
+def predict():
+    prediction = None
+    if request.method == 'POST':
+        # Lấy dữ liệu từ form
+        year = int(request.form['year'])
+        certificate = request.form['certificates']
+        genre = request.form['genre']
+        director = request.form['director']
+        star_cast = request.form['star_cast']
+        metascore = int(request.form['metascore'])
+        duration = int(request.form['duration'])
+
+        # Tạo DataFrame input
+        input_dict = {
+            'Year': [year],
+            'Certificate': [certificate],
+            'Genre': [genre],
+            'Director': [director],
+            'Star': [star_cast],
+            'Meta_score': [metascore],
+            'Duration': [duration]
+        }
+        df = pd.DataFrame(input_dict)
+
+        # One-hot encoding các cột categorical
+        df_encoded = pd.get_dummies(df, columns=categorical_columns)
+
+        # Bổ sung các cột thiếu để khớp với dữ liệu huấn luyện
+        for col in categorical_columns + numerical_columns:
+            if col not in df_encoded.columns:
+                df_encoded[col] = 0
+
+        # Đảm bảo thứ tự cột đúng
+        df_encoded = df_encoded[categorical_columns + numerical_columns]
+
+        # Chuẩn hóa
+        X = scaler.transform(df_encoded)
+
+        # Dự đoán
+        predicted_rating = model.predict(X)[0][0]
+        prediction = round(predicted_rating, 2)
+
+    return render_template("home.html", user=current_user, prediction=prediction)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# Preprocess input data
-def preprocess_input(form_data):
-    from sklearn.preprocessing import LabelEncoder
-
-    # Initialize encoders (should be fitted during training, here for simplicity)
-    certificate_encoder = LabelEncoder()
-    certificate_encoder.fit(['G', 'PG', 'PG-13', 'R', 'NC-17', 'Not Rated', 'Approved'])
-    genre_encoder = LabelEncoder()
-    genre_encoder.fit(['Action', 'Adventure', 'Animation', 'Biography', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Horror', 'Mystery'])
-
-    year = (form_data['year'] - 1900) / (2025 - 1900)
-    metascore = form_data['metascore'] / 100
-    duration = form_data['duration'] / 300
-
-    certificate_one_hot = np.zeros(7)
-    certificate_one_hot[certificate_encoder.transform([form_data['certificate']])[0]] = 1
-
-    genre_one_hot = np.zeros(10)
-    genre_one_hot[genre_encoder.transform([form_data['genre']])[0]] = 1
-
-    input_data = np.array([year, metascore, duration] + certificate_one_hot.tolist() + genre_one_hot.tolist()).reshape(1, -1)
-    return input_data
-
-def predict_rating(form_data):
-    input_data = preprocess_input(form_data)
-    prediction = model.predict(input_data)
-    return np.round(prediction[0][0], 1)
+    return render_template("home.html", prediction=prediction)
