@@ -12,3 +12,4 @@ pip install -r requirements.txt
 
 # 4. Chạy app (nếu có Flask)
 python app.py
+# 5.Link : https://drive.google.com/drive/folders/1XU0JhFbRLiWqLipdMCB1n1tfhXHxsCi_?usp=sharing
