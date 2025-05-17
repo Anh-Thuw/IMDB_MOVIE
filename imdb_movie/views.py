@@ -9,6 +9,7 @@ from . import db
 import json
 import pickle
 import pandas as pd
+import joblib
 
 views = Blueprint('views', __name__)
 
@@ -44,27 +45,35 @@ def delete_note():
 
 #--------------------------------------------model prediction--------------------------------------------
 
-#load model 
-model = load_model('imdb_movie/training_model/imdbMovie_model.keras')
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Load encoders and scaler
-with open('training_model/categorical_columns.pkl', 'rb') as f:
-    categorical_columns = pickle.load(f)
-
-with open('training_model/numerical_columns.pkl', 'rb') as f:
-    numerical_columns = pickle.load(f)
-
-with open('training_model/standard_scaler.pkl', 'rb') as f:
-    scaler = pickle.load(f)
-
-# Load và tiền xử lý dữ liệu huấn luyện một lần khi ứng dụng khởi động
-training_data = pd.read_csv('imdb_movie/training_model/IMDb_Dataset_2.csv')
-training_categorical = training_data[categorical_columns]
-training_categorical_encoded = pd.get_dummies(training_categorical, columns=categorical_columns)
-# Lưu danh sách các cột đã mã hóa one-hot
-training_encoded_columns = training_categorical_encoded.columns
+# Tải mô hình và các đối tượng đã lưu
+model = load_model(os.path.join(BASE_DIR, 'training_model', 'imdbMovie_model.keras'))
+scaler = joblib.load(os.path.join(BASE_DIR, 'training_model', 'standard_scaler.pkl'))
+cat_columns = joblib.load(os.path.join(BASE_DIR, 'training_model', 'categorical_columns.pkl'))
+num_columns = joblib.load(os.path.join(BASE_DIR, 'training_model', 'numerical_columns.pkl'))
 
 
+def preprocess_input(df):
+    # Phân chia cột số và cột phân loại
+    df_num = df[num_columns]
+    df_cat = df.drop(columns=num_columns)
+
+    # Chuẩn hóa dữ liệu số
+    df_num_scaled = pd.DataFrame(scaler.transform(df_num), columns=num_columns)
+
+    # One-hot encode dữ liệu phân loại
+    df_cat_encoded = pd.get_dummies(df_cat)
+    
+    # Đảm bảo các cột one-hot giống với training
+    for col in cat_columns:
+        if col not in df_cat_encoded:
+            df_cat_encoded[col] = 0
+    df_cat_encoded = df_cat_encoded[cat_columns]  # đúng thứ tự
+
+    # Kết hợp lại
+    final_input = pd.concat([df_num_scaled, df_cat_encoded], axis=1)
+    return final_input
 
 @views.route('/predict', methods=['GET', 'POST'])
 def predict():
@@ -91,25 +100,13 @@ def predict():
         }
         df = pd.DataFrame(input_dict)
 
-        # One-hot encoding các cột categorical
-        df_encoded = pd.get_dummies(df, columns=categorical_columns)
-
-        # Bổ sung các cột thiếu để khớp với dữ liệu huấn luyện
-        for col in categorical_columns + numerical_columns:
-            if col not in df_encoded.columns:
-                df_encoded[col] = 0
-
-        # Đảm bảo thứ tự cột đúng
-        df_encoded = df_encoded[categorical_columns + numerical_columns]
-
-        # Chuẩn hóa
-        X = scaler.transform(df_encoded)
-
+        #Tiền xử lý dữ liệu , cho dữ liệu từ form khớp với dữ liệu đã train
+        input_processed = preprocess_input(df)
         # Dự đoán
-        predicted_rating = model.predict(X)[0][0]
-        prediction = round(predicted_rating, 2)
+        pred = model.predict(input_processed)[0][0]
+        prediction = round(pred, 2)
+
 
     return render_template("home.html", user=current_user, prediction=prediction)
 
 
-    return render_template("home.html", prediction=prediction)
