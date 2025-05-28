@@ -1,93 +1,62 @@
-from flask import Blueprint, render_template, request, flash, jsonify, redirect, url_for 
-from tensorflow.keras.models import load_model
+from flask import Blueprint, render_template, request
 import numpy as np
-import imdb_movie.forms as forms
 import os
-from flask_login import login_required, current_user
-from .models import Note
-from . import db
-import json
-import pickle
-import pandas as pd
 import joblib
 
-views = Blueprint('views', __name__)
+views = Blueprint('views', __name__, template_folder='templates')
 
-@views.route('/', methods=['GET'])
-def index():
-    return render_template("login.html", user=current_user)
-
-@views.route('/home', methods=['GET'])
-@login_required
-def home():
-    return render_template("home.html", user=current_user)
-
-
-
-#--------------------------------------------model prediction--------------------------------------------
-
+# Lấy đường dẫn thư mục hiện tại
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Tải mô hình và các đối tượng đã lưu
-model = load_model(os.path.join(BASE_DIR, 'training_model', 'imdbMovie_model.keras'))
-scaler = joblib.load(os.path.join(BASE_DIR, 'training_model', 'standard_scaler.pkl'))
-cat_columns = joblib.load(os.path.join(BASE_DIR, 'training_model', 'categorical_columns.pkl'))
-num_columns = joblib.load(os.path.join(BASE_DIR, 'training_model', 'numerical_columns.pkl'))
+# Load mô hình Random Forest
+model_path = os.path.join(BASE_DIR, 'training_model', 'random_forest_model.pkl')
+model = joblib.load(model_path)
+
+# Danh sách các thể loại theo đúng thứ tự khi huấn luyện
+genres = ['Mystery', 'Drama', 'Musical', 'Fantasy', 'Adventure', 'Western', 'Thriller', 'War',
+          'Biography', 'Family', 'Sport', 'Film-Noir', 'Music', 'Sci-Fi', 'Animation', 'Romance',
+          'Crime', 'Action', 'Comedy', 'History']
 
 
-def preprocess_input(df):
-    # Phân chia cột số và cột phân loại
-    df_num = df[num_columns]
-    df_cat = df.drop(columns=num_columns)
+@views.route('/', methods=['GET'])
+def home():
+    return render_template("index.html")
 
-    # Chuẩn hóa dữ liệu số
-    df_num_scaled = pd.DataFrame(scaler.transform(df_num), columns=num_columns)
 
-    # One-hot encode dữ liệu phân loại
-    df_cat_encoded = pd.get_dummies(df_cat)
-    
-    # Đảm bảo các cột one-hot giống với training
-    for col in cat_columns:
-        if col not in df_cat_encoded:
-            df_cat_encoded[col] = 0
-    df_cat_encoded = df_cat_encoded[cat_columns]  # đúng thứ tự
-
-    # Kết hợp lại
-    final_input = pd.concat([df_num_scaled, df_cat_encoded], axis=1)
-    return final_input
-
-@views.route('/predict', methods=['GET', 'POST'])
+@views.route('/predict', methods=['POST'])
 def predict():
-    prediction = None
-    if request.method == 'POST':
-        # Lấy dữ liệu từ form
+    try:
+        # Lấy dữ liệu số
         year = int(request.form['year'])
-        certificate = request.form['certificates']
-        genre = request.form['genre']
-        director = request.form['director']
-        star_cast = request.form['star_cast']
-        metascore = int(request.form['metascore'])
         duration = int(request.form['duration'])
+        metascore = int(request.form['metascore'])
 
-        # Tạo DataFrame input
-        input_dict = {
-            'Year': [year],
-            'Certificate': [certificate],
-            'Genre': [genre],
-            'Director': [director],
-            'Star': [star_cast],
-            'Meta_score': [metascore],
-            'Duration': [duration]
-        }
-        df = pd.DataFrame(input_dict)
+        # Xử lý votes và gross có thể để trống
+        votes = request.form.get('votes')
+        gross = request.form.get('gross')
 
-        #Tiền xử lý dữ liệu , cho dữ liệu từ form khớp với dữ liệu đã train
-        input_processed = preprocess_input(df)
-        # Dự đoán
-        pred = model.predict(input_processed)[0][0]
-        prediction = round(pred, 2)
+        votes = int(votes) if votes else np.nan
+        gross = float(gross) if gross else np.nan
 
+        # Lấy danh sách genre đã chọn và tạo vector 0/1
+        selected_genres = request.form.getlist('genres')
+        genre_vector = [1 if genre in selected_genres else 0 for genre in genres]
 
-    return render_template("home.html", user=current_user, prediction=prediction)
+        # Tạo mảng đầu vào cho mô hình
+        input_data = np.array([[year, duration, votes, metascore, gross] + genre_vector])
 
+        # Dự đoán điểm IMDb
+        prediction = model.predict(input_data)
+        predicted_rating = round(float(prediction[0]), 2)
 
+        return render_template("index.html", prediction=predicted_rating,
+                                                year=year,
+                                                duration=duration,
+                                                metascore=metascore,
+                                                votes=votes,
+                                                gross=gross,
+                                                selected_genres=selected_genres)
+
+    except Exception as e:
+        print("Error in prediction:", e)
+        return render_template("index.html", prediction="Lỗi trong quá trình dự đoán")
