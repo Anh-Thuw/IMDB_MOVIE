@@ -1,43 +1,25 @@
-# Python cache
-__pycache__/
-*.py[cod]
-*$py.class
+echo "# Virtual environment
+tf_env/
 
-# VSCode settings
+# Python cache files
+__pycache__/
+*.pyc
+
+# Large data and model files (optional, include if you don't want to track them)
+2000-2018.csv
+model.pkl
+genres.pkl
+
+# Environment variables and sensitive files
+.env
+
+# Editor-specific files
 .vscode/
 
-# Virtual environments
-env/
-venv/
-tf_env/
-*.env
-
-# Jupyter Notebook checkpoints
-.ipynb_checkpoints
-
-# Model files
-*.h5
-*.keras
-*.pkl
-*.joblib
-*.sav
-
-# Data files
-*.csv
-*.tsv
-*.xlsx
-
-# Logs and outputs
-*.log
-*.out
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Pipenv/Poetry
+# Pipenv files (if using requirements.txt instead)
+Pipfile
 Pipfile.lock
-poetry.lock
 
-# Others
-*.bak
+# Miscellaneous
+*.log
+*.ipynb_checkpoints/" > .gitignore
