@@ -39,7 +39,7 @@
 </head>
 <body>
   <div class="container">
-    <h1 class="text-center mb-4">IMDb Rating Prediction</h1>
+    <h1 class="text-center mb-4">🎬 IMDb Rating Prediction</h1>
 
     <div class="card shadow">
       <div class="card-body">
@@ -72,46 +72,39 @@
               />
             </div>
           </div>
-
-          <div class="form-row">
-            <div class="form-group col-md-6">
-              <label for="metascore">Metascore (0–100)</label>
-              <input
-                type="number"
-                class="form-control"
-                id="metascore"
-                name="metascore"
-                min="0"
-                max="100"
-                required
-                value="{{ request.form.metascore or '' }}"
-              />
-            </div>
-            <div class="form-group col-md-6">
-              <label for="votes">Number of Votes (optional)</label>
-              <input
-                type="number"
-                class="form-control"
-                id="votes"
-                name="votes"
-                min="0"
-                placeholder="Enter IMDb vote count"
-                value="{{ request.form.votes or '' }}"
-              />
-            </div>
+         <!--<div class="form-group">
+            <label for="votes">Number of Votes</label>
+            <input
+              type="number"
+              class="form-control"
+              id="votes"
+              name="votes"
+              min="0"
+              required
+              value="{{ request.form.votes or '' }}"
+            />
+          </div>-->
+          <div class="form-group">
+            <label for="directorName">Director</label>
+            <input
+              type="text"
+              class="form-control"
+              id="directorName"
+              name="directorName"
+              required
+              value="{{ request.form.directorName or '' }}"
+            />
           </div>
 
           <div class="form-group">
-            <label for="gross">Gross Revenue ($M, optional)</label>
+            <label for="writeName">Writer</label>
             <input
-              type="number"
-              step="0.01"
+              type="text"
               class="form-control"
-              id="gross"
-              name="gross"
-              min="0"
-              placeholder="Enter gross revenue in millions"
-              value="{{ request.form.gross or '' }}"
+              id="writeName"
+              name="writeName"
+              required
+              value="{{ request.form.writeName or '' }}"
             />
           </div>
 

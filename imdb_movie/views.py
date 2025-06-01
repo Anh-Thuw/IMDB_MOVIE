@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request
 import numpy as np
 import os
 import joblib
+import pandas as pd
 
 views = Blueprint('views', __name__, template_folder='templates')
 
@@ -9,13 +10,12 @@ views = Blueprint('views', __name__, template_folder='templates')
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Load mô hình Random Forest
-model_path = os.path.join(BASE_DIR, 'training_model', 'random_forest_model.pkl')
+model_path = os.path.join(BASE_DIR, 'training_model', 'model.pkl')
 model = joblib.load(model_path)
 
 # Danh sách các thể loại theo đúng thứ tự khi huấn luyện
-genres = ['Mystery', 'Drama', 'Musical', 'Fantasy', 'Adventure', 'Western', 'Thriller', 'War',
-          'Biography', 'Family', 'Sport', 'Film-Noir', 'Music', 'Sci-Fi', 'Animation', 'Romance',
-          'Crime', 'Action', 'Comedy', 'History']
+genres_path = os.path.join(BASE_DIR, 'training_model', 'genres.pkl')
+genres = joblib.load(genres_path)
 
 
 @views.route('/', methods=['GET'])
@@ -26,37 +26,44 @@ def home():
 @views.route('/predict', methods=['POST'])
 def predict():
     try:
-        # Lấy dữ liệu số
+        # Lấy dữ liệu từ form
         year = int(request.form['year'])
         duration = int(request.form['duration'])
-        metascore = int(request.form['metascore'])
+        # Nếu muốn dùng votes thì mở comment và thêm vào input
+        # votes = int(request.form['votes'])
+        director = request.form['directorName']
+        writer = request.form['writeName']
+        selected_genres = request.form.getlist('genres')  # list thể loại người dùng chọn
 
-        # Xử lý votes và gross có thể để trống
-        votes = request.form.get('votes')
-        gross = request.form.get('gross')
+        # Tạo dictionary đầu vào
+        input_dict = {
+            'directorName': [director],
+            'writeName': [writer],
+            'runtime': [duration],
+            'year': [year],
+            # 'votes': [votes],  # nếu có votes trong model thì thêm vào đây
+        }
 
-        votes = int(votes) if votes else np.nan
-        gross = float(gross) if gross else np.nan
+        # Thêm cột one-hot cho từng thể loại
+        for g in genres:
+            input_dict[g] = [1 if g in selected_genres else 0]
 
-        # Lấy danh sách genre đã chọn và tạo vector 0/1
-        selected_genres = request.form.getlist('genres')
-        genre_vector = [1 if genre in selected_genres else 0 for genre in genres]
+        # Tạo DataFrame input cho model
+        input_df = pd.DataFrame(input_dict)
 
-        # Tạo mảng đầu vào cho mô hình
-        input_data = np.array([[year, duration, votes, metascore, gross] + genre_vector])
+        # Dự đoán
+        pred = model.predict(input_df)[0]
+        prediction = round(pred, 2)
 
-        # Dự đoán điểm IMDb
-        prediction = model.predict(input_data)
-        predicted_rating = round(float(prediction[0]), 2)
-
-        return render_template("index.html", prediction=predicted_rating,
-                                                year=year,
-                                                duration=duration,
-                                                metascore=metascore,
-                                                votes=votes,
-                                                gross=gross,
-                                                selected_genres=selected_genres)
+        # Trả kết quả về trang index.html, truyền các biến giữ nguyên form và kết quả
+        return render_template('index.html',
+                               prediction=prediction,
+                               year=year,
+                               duration=duration,
+                               directorName=director,
+                               writeName=writer,
+                               selected_genres=selected_genres)
 
     except Exception as e:
         print("Error in prediction:", e)
-        return render_template("index.html", prediction="Lỗi trong quá trình dự đoán")
+        return render_template('index.html', prediction="Lỗi trong quá trình dự đoán")
