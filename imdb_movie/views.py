@@ -30,7 +30,7 @@ def predict():
         year = int(request.form['year'])
         duration = int(request.form['duration'])
         # Nếu muốn dùng votes thì mở comment và thêm vào input
-        # votes = int(request.form['votes'])
+        votes = int(request.form['votes'])
         director = request.form['directorName']
         writer = request.form['writeName']
         selected_genres = request.form.getlist('genres')  # list thể loại người dùng chọn
@@ -41,7 +41,7 @@ def predict():
             'writeName': [writer],
             'runtime': [duration],
             'year': [year],
-            # 'votes': [votes],  # nếu có votes trong model thì thêm vào đây
+            'votes': [votes],  # nếu có votes trong model thì thêm vào đây
         }
 
         # Thêm cột one-hot cho từng thể loại
@@ -59,6 +59,7 @@ def predict():
         return render_template('index.html',
                                prediction=prediction,
                                year=year,
+                               votes=votes,
                                duration=duration,
                                directorName=director,
                                writeName=writer,
