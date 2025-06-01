@@ -12,7 +12,7 @@ tf_env/
 # File mô hình huấn luyện (model)
 *.h5
 *.keras
-
+*.pkl
 # File dữ liệu gốc (tùy theo dự án, có thể giữ lại nếu cần)
 training_model/IMDb_Dataset_2.csv
 
